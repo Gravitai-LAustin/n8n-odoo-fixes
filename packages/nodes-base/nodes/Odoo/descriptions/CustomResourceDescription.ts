@@ -30,6 +30,12 @@ export const customResourceOperations: INodeProperties[] = [
 		},
 		options: [
 			{
+				name: 'Call Method',
+				value: 'callMethod',
+				description: 'Call a model method by name via Odoo JSON-2',
+				action: 'Call a model method',
+			},
+			{
 				name: 'Create',
 				value: 'create',
 				description: 'Create a new item',
@@ -64,6 +70,41 @@ export const customResourceOperations: INodeProperties[] = [
 ];
 
 export const customResourceDescription: INodeProperties[] = [
+	/* -------------------------------------------------------------------------- */
+	/*                             custom:callMethod                              */
+	/* -------------------------------------------------------------------------- */
+	{
+		displayName: 'Method Name',
+		name: 'methodName',
+		type: 'string',
+		default: '',
+		required: true,
+		placeholder: 'action_confirm',
+		description: 'Python method name to call on the selected model',
+		displayOptions: {
+			show: {
+				operation: ['callMethod'],
+				resource: ['custom'],
+			},
+		},
+	},
+	{
+		displayName: 'Method Payload',
+		name: 'methodPayload',
+		type: 'json',
+		typeOptions: {
+			alwaysOpenEditWindow: true,
+		},
+		default: '{\n  "ids": [123]\n}',
+		description: 'JSON body to send to <code>/json/2/&lt;model&gt;/&lt;method&gt;</code>',
+		displayOptions: {
+			show: {
+				operation: ['callMethod'],
+				resource: ['custom'],
+			},
+		},
+	},
+
 	/* -------------------------------------------------------------------------- */
 	/*                                custom:create                               */
 	/* -------------------------------------------------------------------------- */

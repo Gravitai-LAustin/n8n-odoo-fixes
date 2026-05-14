@@ -11,8 +11,9 @@ import type {
 	INodeType,
 	INodeTypeDescription,
 	IRequestOptions,
+	JsonValue,
 } from 'n8n-workflow';
-import { NodeConnectionTypes, deepCopy, randomInt } from 'n8n-workflow';
+import { NodeConnectionTypes, NodeOperationError, deepCopy, randomInt } from 'n8n-workflow';
 
 import {
 	contactDescription,
@@ -33,10 +34,28 @@ import {
 	odooGetDBName,
 	odooGetModelFields,
 	odooGetUserID,
+	odooJSON2Request,
 	odooJSONRPCRequest,
 	odooUpdate,
 	processNameValueFields,
 } from './GenericFunctions';
+
+function normalizeMethodCallResponse(response: unknown): IDataObject | IDataObject[] {
+	if (Array.isArray(response)) {
+		const allObjects = response.every(
+			(item): item is IDataObject =>
+				item !== null && typeof item === 'object' && !Array.isArray(item),
+		);
+
+		return allObjects ? response : [{ result: response as JsonValue[] }];
+	}
+
+	if (response !== null && typeof response === 'object') {
+		return response as IDataObject;
+	}
+
+	return { result: response as JsonValue };
+}
 
 export class Odoo implements INodeType {
 	description: INodeTypeDescription = {
@@ -297,7 +316,8 @@ export class Odoo implements INodeType {
 		const username = credentials.username as string;
 		const password = credentials.password as string;
 		const db = odooGetDBName(credentials.db as string, url);
-		const userID = await odooGetUserID.call(this, db, username, password, url);
+		const requiresUserLogin = !(resource === 'custom' && operation === 'callMethod');
+		const userID = requiresUserLogin ? await odooGetUserID.call(this, db, username, password, url) : 0;
 
 		//----------------------------------------------------------------------
 		//                            Main loop
@@ -432,6 +452,33 @@ export class Odoo implements INodeType {
 
 				if (resource === 'custom') {
 					const customResource = this.getNodeParameter('customResource', i) as string;
+					if (operation === 'callMethod') {
+						const methodName = this.getNodeParameter('methodName', i) as string;
+						const payloadText = this.getNodeParameter('methodPayload', i, '{}') as string;
+						let payload: JsonValue;
+
+						try {
+							payload = JSON.parse(payloadText) as JsonValue;
+						} catch (error) {
+							throw new NodeOperationError(this.getNode(), 'Method Payload must be valid JSON', {
+								itemIndex: i,
+								description: error instanceof Error ? error.message : undefined,
+							});
+						}
+
+						const methodResponse = await odooJSON2Request.call(
+							this,
+							payload,
+							url,
+							password,
+							db,
+							customResource,
+							methodName,
+						);
+
+						responseData = normalizeMethodCallResponse(methodResponse);
+					}
+
 					if (operation === 'create') {
 						const fields = this.getNodeParameter('fieldsToCreateOrUpdate', i) as IDataObject;
 						responseData = await odooCreate.call(

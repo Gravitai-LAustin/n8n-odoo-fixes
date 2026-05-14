@@ -4,6 +4,7 @@ import type {
 	IHookFunctions,
 	ILoadOptionsFunctions,
 	JsonObject,
+	JsonValue,
 	IRequestOptions,
 } from 'n8n-workflow';
 import { NodeApiError, randomInt } from 'n8n-workflow';
@@ -127,6 +128,36 @@ export async function odooJSONRPCRequest(
 			});
 		}
 		return response.result;
+	} catch (error) {
+		throw new NodeApiError(this.getNode(), error as JsonObject);
+	}
+}
+
+export async function odooJSON2Request(
+	this: IHookFunctions | IExecuteFunctions | ILoadOptionsFunctions,
+	body: JsonValue,
+	url: string,
+	apiKey: string,
+	db: string,
+	resource: string,
+	methodName: string,
+): Promise<unknown> {
+	try {
+		const options: IRequestOptions = {
+			headers: {
+				Connection: 'keep-alive',
+				Accept: '*/*',
+				Authorization: `Bearer ${apiKey}`,
+				'Content-Type': 'application/json',
+				'X-Odoo-Database': db,
+			},
+			method: 'POST',
+			body,
+			uri: `${url}/json/2/${encodeURIComponent(resource)}/${encodeURIComponent(methodName)}`,
+			json: true,
+		};
+
+		return await this.helpers.request(options);
 	} catch (error) {
 		throw new NodeApiError(this.getNode(), error as JsonObject);
 	}
